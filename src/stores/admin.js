@@ -17,12 +17,13 @@ export const useAdminStore = defineStore('admin', () => {
 
     try {
       const data = await getAllUsers(page, limit)
-      users.value = data.users
-      totalUsers.value = data.total
-      currentPage.value = data.page
-      usersPerPage.value = data.limit
+      users.value = data.users || []
+      totalUsers.value = data.total || 0
+      currentPage.value = data.page || 0
+      usersPerPage.value = data.limit || 20
     } catch (err) {
       error.value = err.response?.data?.error || 'Failed to fetch users'
+      users.value = []
       throw err
     } finally {
       isLoading.value = false

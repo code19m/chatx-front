@@ -1,8 +1,8 @@
 import apiClient from '../utils/axios'
 
-export async function login(email, password) {
+export async function login(username, password) {
   const response = await apiClient.post('/auth/login', {
-    email,
+    username,
     password
   })
   return response.data
@@ -44,10 +44,12 @@ export async function createUser(email, username, password) {
   return response.data
 }
 
-export async function getAllUsers(page = 0, limit = 20) {
-  const response = await apiClient.get('/auth/users', {
-    params: { page, limit }
-  })
+export async function getAllUsers(page = 0, limit = 20, search = '') {
+  const params = { page, limit }
+  if (search) {
+    params.search = search
+  }
+  const response = await apiClient.get('/auth/users', { params })
   return response.data
 }
 

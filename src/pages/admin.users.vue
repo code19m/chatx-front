@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useAdminStore } from '../stores/admin'
+import ChatLayout from '../components/layout/ChatLayout.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -132,8 +133,9 @@ function formatDate(dateString) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-purple-50 via-lavender-50 to-purple-100 p-8">
-    <div class="max-w-7xl mx-auto">
+  <ChatLayout>
+    <div class="flex-1 bg-gradient-to-br from-emerald-50 via-teal-50 to-emerald-100 p-8 overflow-y-auto">
+      <div class="max-w-7xl mx-auto">
       <!-- Header -->
       <div class="mb-8 flex items-center justify-between">
         <div>
@@ -142,7 +144,7 @@ function formatDate(dateString) {
         </div>
         <button
           @click="openNewUserModal"
-          class="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-6 py-3 rounded-lg font-medium transition shadow-lg shadow-purple-500/30"
+          class="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white px-6 py-3 rounded-lg font-medium transition shadow-lg shadow-emerald-500/30 cursor-pointer"
         >
           + New User
         </button>
@@ -154,23 +156,23 @@ function formatDate(dateString) {
         class="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center justify-between"
       >
         <span>{{ adminStore.error }}</span>
-        <button @click="adminStore.clearError" class="text-red-700 hover:text-red-900">
+        <button @click="adminStore.clearError" class="text-red-700 hover:text-red-900 cursor-pointer">
           ✕
         </button>
       </div>
 
       <!-- Users Table -->
-      <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-purple-100">
+      <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-emerald-100">
         <!-- Loading State -->
         <div v-if="adminStore.isLoading" class="p-12 text-center">
-          <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+          <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
           <p class="mt-4 text-gray-600">Loading users...</p>
         </div>
 
         <!-- Users List -->
-        <div v-else-if="adminStore.users.length > 0">
+        <div v-else-if="adminStore.users && adminStore.users.length > 0">
           <table class="w-full">
-            <thead class="bg-gradient-to-r from-purple-50 to-purple-100 border-b border-purple-200">
+            <thead class="bg-gradient-to-r from-emerald-50 to-emerald-100 border-b border-emerald-200">
               <tr>
                 <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">User</th>
                 <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">Email</th>
@@ -183,11 +185,11 @@ function formatDate(dateString) {
               <tr
                 v-for="user in adminStore.users"
                 :key="user.user_id"
-                class="hover:bg-purple-50/50 transition"
+                class="hover:bg-emerald-50/50 transition"
               >
                 <td class="px-6 py-4">
                   <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-white font-semibold">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-semibold">
                       {{ user.username.charAt(0).toUpperCase() }}
                     </div>
                     <span class="font-medium text-gray-900">{{ user.username }}</span>
@@ -199,7 +201,7 @@ function formatDate(dateString) {
                     :class="[
                       'px-3 py-1 rounded-full text-xs font-semibold',
                       user.role === 'admin'
-                        ? 'bg-purple-100 text-purple-700'
+                        ? 'bg-emerald-100 text-emerald-700'
                         : 'bg-gray-100 text-gray-700'
                     ]"
                   >
@@ -211,7 +213,7 @@ function formatDate(dateString) {
                   <button
                     @click="confirmDelete(user)"
                     :disabled="user.user_id === authStore.user?.user_id"
-                    class="text-red-600 hover:text-red-800 font-medium disabled:text-gray-400 disabled:cursor-not-allowed transition"
+                    class="text-red-600 hover:text-red-800 font-medium disabled:text-gray-400 disabled:cursor-not-allowed transition cursor-pointer"
                   >
                     Delete
                   </button>
@@ -223,7 +225,7 @@ function formatDate(dateString) {
           <!-- Pagination -->
           <div v-if="totalPages > 1" class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
             <p class="text-sm text-gray-600">
-              Showing {{ adminStore.users.length }} of {{ adminStore.totalUsers }} users
+              Showing {{ adminStore.users?.length || 0 }} of {{ adminStore.totalUsers }} users
             </p>
             <div class="flex gap-2">
               <button
@@ -231,10 +233,10 @@ function formatDate(dateString) {
                 :key="page"
                 @click="handlePageChange(page - 1)"
                 :class="[
-                  'px-4 py-2 rounded-lg font-medium transition',
+                  'px-4 py-2 rounded-lg font-medium transition cursor-pointer',
                   page - 1 === adminStore.currentPage
-                    ? 'bg-gradient-to-r from-purple-600 to-purple-700 text-white'
-                    : 'bg-white text-gray-700 hover:bg-purple-50'
+                    ? 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white'
+                    : 'bg-white text-gray-700 hover:bg-emerald-50'
                 ]"
               >
                 {{ page }}
@@ -248,7 +250,7 @@ function formatDate(dateString) {
           <p class="text-gray-500 text-lg">No users found</p>
           <button
             @click="openNewUserModal"
-            class="mt-4 text-purple-600 hover:text-purple-800 font-medium"
+            class="mt-4 text-emerald-600 hover:text-emerald-800 font-medium cursor-pointer"
           >
             Create your first user
           </button>
@@ -270,13 +272,13 @@ function formatDate(dateString) {
         <div class="flex gap-3 justify-end">
           <button
             @click="cancelDelete"
-            class="px-6 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium transition"
+            class="px-6 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium transition cursor-pointer"
           >
             Cancel
           </button>
           <button
             @click="handleDelete"
-            class="px-6 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium transition"
+            class="px-6 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium transition cursor-pointer"
           >
             Delete User
           </button>
@@ -304,7 +306,7 @@ function formatDate(dateString) {
               v-model="newUserForm.email"
               type="email"
               required
-              class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
+              class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition"
               :class="{ 'border-red-500': formErrors.email }"
               placeholder="user@example.com"
             />
@@ -323,7 +325,7 @@ function formatDate(dateString) {
               v-model="newUserForm.username"
               type="text"
               required
-              class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
+              class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition"
               :class="{ 'border-red-500': formErrors.username }"
               placeholder="johndoe"
             />
@@ -345,7 +347,7 @@ function formatDate(dateString) {
               v-model="newUserForm.password"
               type="password"
               required
-              class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
+              class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition"
               :class="{ 'border-red-500': formErrors.password }"
               placeholder="••••••••"
             />
@@ -363,14 +365,14 @@ function formatDate(dateString) {
               type="button"
               @click="closeNewUserModal"
               :disabled="isSubmitting"
-              class="px-6 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium transition disabled:opacity-50"
+              class="px-6 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium transition disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
             >
               Cancel
             </button>
             <button
               type="submit"
               :disabled="isSubmitting"
-              class="px-6 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-medium transition disabled:opacity-50 shadow-lg shadow-purple-500/30"
+              class="px-6 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-medium transition disabled:opacity-50 shadow-lg shadow-emerald-500/30 cursor-pointer disabled:cursor-not-allowed"
             >
               <span v-if="!isSubmitting">Create User</span>
               <span v-else>Creating...</span>
@@ -379,5 +381,6 @@ function formatDate(dateString) {
         </form>
       </div>
     </div>
-  </div>
+      </div>
+    </ChatLayout>
 </template>
