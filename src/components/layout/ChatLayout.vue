@@ -2,9 +2,11 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
+import { useChatStore } from '../../stores/chat'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const chatStore = useChatStore()
 
 function handleLogout() {
   authStore.clearAuth()
@@ -30,12 +32,19 @@ function goToAdmin() {
         <!-- All Chats -->
         <button
           @click="router.push('/')"
-          class="w-12 h-12 rounded-xl bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-300 hover:text-white transition cursor-pointer"
+          class="w-12 h-12 rounded-xl bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-300 hover:text-white transition cursor-pointer relative"
           title="All Chats"
         >
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
+          <!-- Unread badge -->
+          <div
+            v-if="chatStore.totalUnreadCount > 0"
+            class="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center"
+          >
+            {{ chatStore.totalUnreadCount > 99 ? '99+' : chatStore.totalUnreadCount }}
+          </div>
         </button>
 
         <!-- Admin (only for admins) -->

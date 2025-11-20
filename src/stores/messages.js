@@ -13,10 +13,15 @@ export const useMessagesStore = defineStore('messages', () => {
   const totalMessages = ref(0)
   const messagesPerPage = ref(50)
   const loading = ref(false)
+  const loadingMore = ref(false)
   const sending = ref(false)
   const error = ref(null)
 
   const isLoading = computed(() => loading.value || sending.value)
+  const hasMore = computed(() => {
+    const loaded = messages.value.length
+    return loaded < totalMessages.value
+  })
 
   async function fetchMessages(chatId, page = 0, limit = 50) {
     loading.value = true
@@ -33,6 +38,31 @@ export const useMessagesStore = defineStore('messages', () => {
       throw err
     } finally {
       loading.value = false
+    }
+  }
+
+  async function loadMoreMessages(chatId) {
+    if (loadingMore.value || !hasMore.value) {
+      return
+    }
+
+    loadingMore.value = true
+    error.value = null
+    try {
+      const nextPage = currentPage.value + 1
+      const data = await getMessages(chatId, nextPage, messagesPerPage.value)
+
+      // Prepend older messages to the beginning
+      const olderMessages = data.messages || []
+      messages.value = [...olderMessages, ...messages.value]
+
+      currentPage.value = nextPage
+      totalMessages.value = data.total || 0
+    } catch (err) {
+      error.value = err.response?.data?.error || 'Failed to load more messages'
+      throw err
+    } finally {
+      loadingMore.value = false
     }
   }
 
@@ -98,10 +128,13 @@ export const useMessagesStore = defineStore('messages', () => {
     totalMessages,
     messagesPerPage,
     loading,
+    loadingMore,
     sending,
     isLoading,
+    hasMore,
     error,
     fetchMessages,
+    loadMoreMessages,
     send,
     edit,
     remove,

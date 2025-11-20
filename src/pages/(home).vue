@@ -4,6 +4,8 @@ import ChatLayout from '../components/layout/ChatLayout.vue'
 import MessageBubble from '../components/features/chat/MessageBubble.vue'
 import MessageInput from '../components/features/chat/MessageInput.vue'
 import NewDMDialog from '../components/features/chat/NewDMDialog.vue'
+import NewGroupDialog from '../components/features/chat/NewGroupDialog.vue'
+import ChatDetailsPanel from '../components/features/chat/ChatDetailsPanel.vue'
 import { useChatStore } from '../stores/chat'
 import { useMessagesStore } from '../stores/messages'
 
@@ -14,13 +16,23 @@ const messagesContainer = ref(null)
 const editingMessageId = ref(null)
 const editingContent = ref('')
 const showNewDMDialog = ref(false)
+const showNewGroupDialog = ref(false)
 
 const activeChat = computed(() => chatStore.activeChat)
 const messages = computed(() => messagesStore.messages)
 const isLoading = computed(() => messagesStore.isLoading)
+const hasMore = computed(() => messagesStore.hasMore)
+const loadingMore = computed(() => messagesStore.loadingMore)
 
 onMounted(async () => {
   await chatStore.fetchAllChats()
+  await chatStore.fetchTotalUnreadCount()
+
+  // Fetch online statuses for all DM participants
+  const dmUserIds = chatStore.dms.map(dm => dm.other_user_id)
+  if (dmUserIds.length > 0) {
+    await chatStore.fetchOnlineStatuses(dmUserIds)
+  }
 })
 
 // Watch for active chat changes and load messages
@@ -30,17 +42,62 @@ watch(activeChat, async (newChat) => {
     editingContent.value = ''
     await messagesStore.fetchMessages(newChat.chat_id)
     scrollToBottom()
+
+    // Mark chat as read if there are messages
+    if (messages.value.length > 0) {
+      const lastMessage = messages.value[messages.value.length - 1]
+      await chatStore.markChatAsRead(newChat.chat_id, lastMessage.message_id)
+    }
   }
 }, { immediate: true })
 
 // Watch for new messages and scroll to bottom
-watch(() => messages.value.length, () => {
+watch(() => messages.value.length, async () => {
   nextTick(() => scrollToBottom())
+
+  // Mark as read when new messages arrive
+  if (activeChat.value && messages.value.length > 0) {
+    const lastMessage = messages.value[messages.value.length - 1]
+    await chatStore.markChatAsRead(activeChat.value.chat_id, lastMessage.message_id)
+  }
 })
 
 function scrollToBottom() {
   if (messagesContainer.value) {
     messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+  }
+}
+
+async function handleScroll() {
+  if (!messagesContainer.value || !activeChat.value) return
+
+  const container = messagesContainer.value
+  const scrollTop = container.scrollTop
+
+  // If scrolled near the top (within 150px) and there are more messages
+  if (scrollTop < 150 && hasMore.value && !loadingMore.value) {
+    // Get the ID of the first currently visible message
+    const firstMessageId = messages.value[0]?.message_id
+
+    await messagesStore.loadMoreMessages(activeChat.value.chat_id)
+
+    // Wait for Vue to update the DOM
+    await nextTick()
+
+    // Wait a bit more for rendering to complete
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Find the message that was previously first and scroll to it
+    if (firstMessageId) {
+      const messageElements = container.querySelectorAll('[class*="flex mb-4"]')
+      const messageArray = Array.from(messageElements)
+
+      // Find the element by matching message ID from the messages array
+      const oldFirstMessageIndex = messages.value.findIndex(m => m.message_id === firstMessageId)
+      if (oldFirstMessageIndex >= 0 && messageArray[oldFirstMessageIndex]) {
+        messageArray[oldFirstMessageIndex].scrollIntoView({ block: 'start', behavior: 'instant' })
+      }
+    }
   }
 }
 
@@ -91,6 +148,43 @@ function openNewDMDialog() {
 function closeNewDMDialog() {
   showNewDMDialog.value = false
 }
+
+function openNewGroupDialog() {
+  showNewGroupDialog.value = true
+}
+
+function closeNewGroupDialog() {
+  showNewGroupDialog.value = false
+}
+
+async function handleLoadMore() {
+  if (!messagesContainer.value || !activeChat.value) return
+
+  const container = messagesContainer.value
+
+  // Get the ID of the first currently visible message
+  const firstMessageId = messages.value[0]?.message_id
+
+  await messagesStore.loadMoreMessages(activeChat.value.chat_id)
+
+  // Wait for Vue to update the DOM
+  await nextTick()
+
+  // Wait a bit more for rendering to complete
+  await new Promise(resolve => setTimeout(resolve, 100))
+
+  // Find the message that was previously first and scroll to it
+  if (firstMessageId) {
+    const messageElements = container.querySelectorAll('[class*="flex mb-4"]')
+    const messageArray = Array.from(messageElements)
+
+    // Find the element by matching message ID from the messages array
+    const oldFirstMessageIndex = messages.value.findIndex(m => m.message_id === firstMessageId)
+    if (oldFirstMessageIndex >= 0 && messageArray[oldFirstMessageIndex]) {
+      messageArray[oldFirstMessageIndex].scrollIntoView({ block: 'start', behavior: 'instant' })
+    }
+  }
+}
 </script>
 
 <template>
@@ -100,15 +194,26 @@ function closeNewDMDialog() {
       <!-- Header -->
       <div class="p-4 border-b border-gray-200 flex items-center justify-between">
         <h2 class="text-xl font-bold text-gray-900">Chats</h2>
-        <button
-          @click="openNewDMDialog"
-          class="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white flex items-center justify-center transition shadow-md cursor-pointer"
-          title="New Direct Message"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-          </svg>
-        </button>
+        <div class="flex gap-2">
+          <button
+            @click="openNewDMDialog"
+            class="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white flex items-center justify-center transition shadow-md cursor-pointer"
+            title="New Direct Message"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+          </button>
+          <button
+            @click="openNewGroupDialog"
+            class="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white flex items-center justify-center transition shadow-md cursor-pointer"
+            title="New Group Chat"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <!-- Chat List -->
@@ -131,9 +236,16 @@ function closeNewDMDialog() {
             :class="{ 'bg-emerald-50': activeChat?.chat_id === chat.chat_id }"
             @click="chatStore.setActiveChat(chat.chat_id)"
           >
-            <!-- Avatar -->
-            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-semibold flex-shrink-0">
-              {{ chat.name?.charAt(0).toUpperCase() || '?' }}
+            <!-- Avatar with online status -->
+            <div class="relative flex-shrink-0">
+              <div class="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-semibold">
+                {{ chat.name?.charAt(0).toUpperCase() || '?' }}
+              </div>
+              <!-- Online indicator (only for DMs) -->
+              <div
+                v-if="chat.type === 'direct' && chatStore.onlineStatuses[chat.participant_id]?.is_online"
+                class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"
+              ></div>
             </div>
 
             <!-- Chat Info -->
@@ -173,12 +285,31 @@ function closeNewDMDialog() {
       <div v-else class="flex-1 flex flex-col">
         <!-- Chat header -->
         <div class="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-3">
-          <div class="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-semibold">
-            {{ getChatDisplayName(activeChat).charAt(0).toUpperCase() }}
+          <div class="relative">
+            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-semibold">
+              {{ getChatDisplayName(activeChat).charAt(0).toUpperCase() }}
+            </div>
+            <!-- Online indicator for DMs -->
+            <div
+              v-if="activeChat.type === 'direct' && chatStore.onlineStatuses[activeChat.participant_id]?.is_online"
+              class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"
+            ></div>
           </div>
           <div class="flex-1">
             <h3 class="font-semibold text-gray-900">{{ getChatDisplayName(activeChat) }}</h3>
-            <p class="text-xs text-gray-500">{{ activeChat.type === 'direct' ? 'Direct Message' : 'Group' }}</p>
+            <p class="text-xs text-gray-500">
+              <template v-if="activeChat.type === 'direct'">
+                <span v-if="chatStore.onlineStatuses[activeChat.participant_id]?.is_online" class="text-green-600 font-medium">
+                  Online
+                </span>
+                <span v-else>
+                  Offline
+                </span>
+              </template>
+              <template v-else>
+                Group · {{ activeChat.participant_count || 0 }} participant{{ activeChat.participant_count !== 1 ? 's' : '' }}
+              </template>
+            </p>
           </div>
         </div>
 
@@ -186,6 +317,7 @@ function closeNewDMDialog() {
         <div
           ref="messagesContainer"
           class="flex-1 overflow-y-auto px-6 py-4"
+          @scroll="handleScroll"
         >
           <!-- Loading state -->
           <div v-if="isLoading" class="flex items-center justify-center py-12">
@@ -206,6 +338,21 @@ function closeNewDMDialog() {
 
           <!-- Messages list -->
           <div v-else>
+            <!-- Load more indicator -->
+            <div v-if="hasMore" class="flex justify-center py-4">
+              <div v-if="loadingMore" class="flex items-center gap-2 text-gray-600 text-sm">
+                <div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-600"></div>
+                <span>Loading more messages...</span>
+              </div>
+              <button
+                v-else
+                @click="handleLoadMore"
+                class="px-4 py-2 text-sm text-emerald-600 hover:text-emerald-700 font-medium cursor-pointer"
+              >
+                ↑ Load older messages
+              </button>
+            </div>
+
             <MessageBubble
               v-for="message in messages"
               :key="message.message_id"
@@ -215,6 +362,7 @@ function closeNewDMDialog() {
               :sender-username="message.sender_username"
               :sent-at="message.sent_at"
               :is-edited="message.is_edited"
+              :is-group-chat="activeChat.type === 'group'"
               @edit="handleEditMessage"
               @delete="handleDeleteMessage"
             />
@@ -232,10 +380,23 @@ function closeNewDMDialog() {
       </div>
     </div>
 
+    <!-- Chat Details Panel (only for groups) -->
+    <ChatDetailsPanel
+      v-if="activeChat"
+      :chat-id="activeChat.chat_id"
+      :chat-type="activeChat.type"
+    />
+
     <!-- New DM Dialog -->
     <NewDMDialog
       v-if="showNewDMDialog"
       @close="closeNewDMDialog"
+    />
+
+    <!-- New Group Dialog -->
+    <NewGroupDialog
+      v-if="showNewGroupDialog"
+      @close="closeNewGroupDialog"
     />
   </ChatLayout>
 </template>

@@ -26,6 +26,10 @@ const props = defineProps({
   isEdited: {
     type: Boolean,
     default: false
+  },
+  isGroupChat: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -35,6 +39,10 @@ const authStore = useAuthStore()
 
 const isSent = computed(() => {
   return authStore.user?.user_id === props.senderId
+})
+
+const shouldShowSenderName = computed(() => {
+  return props.isGroupChat
 })
 
 function formatTime(dateString) {
@@ -65,8 +73,14 @@ function handleDelete() {
             : 'bg-white text-gray-900 rounded-bl-sm'
         ]"
       >
-        <!-- Sender name (only for received messages) -->
-        <div v-if="!isSent" class="text-xs font-semibold text-emerald-600 mb-1">
+        <!-- Sender name (for group chats) -->
+        <div
+          v-if="shouldShowSenderName"
+          :class="[
+            'text-xs font-semibold mb-1',
+            isSent ? 'text-emerald-100' : 'text-emerald-600'
+          ]"
+        >
           {{ senderUsername }}
         </div>
 
